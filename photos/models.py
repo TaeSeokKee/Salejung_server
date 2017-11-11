@@ -13,8 +13,10 @@ class Photo(models.Model):
     lng = models.DecimalField(max_digits=9, decimal_places=6, blank=False)
     address = models.CharField(max_length=100, blank=False)
 
+
     class Meta:
+        # lng index and next lat index is more efficient.
         indexes = [
-            models.Index(fields=['lat', 'lng'])
+            models.Index(fields=['lng', 'lat'])
         ]
 
