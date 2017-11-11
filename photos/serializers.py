@@ -5,5 +5,5 @@ from rest_framework import serializers
 class PhotoGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Photo
-        fields = ('user', 'photo', 'price', 'detail', 'lat', 'lng')
+        fields = ('user', 'photo', 'price', 'detail', 'date', 'lat', 'lng', 'address',)
 

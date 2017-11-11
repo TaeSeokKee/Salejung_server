@@ -41,10 +41,8 @@ def getPostPhoto(request):
         return Response(GET_SUCCESS)
 
     elif request.method == 'POST':
-        form = PhotoForm(request.POST, request.FILES)
-        #print(request.POST)
-        #print(request.FILES)
-        #print(request)
+        form = PhotoForm(request.POST)
+        print(request.POST)
         if form.is_valid():
             form.save()
             return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
