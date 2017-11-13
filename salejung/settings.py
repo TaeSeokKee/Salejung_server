@@ -143,7 +143,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
-
+DEFAULT_CHARSET = 'utf-8'
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage' 
 
