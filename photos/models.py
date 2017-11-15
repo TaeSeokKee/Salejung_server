@@ -4,7 +4,7 @@ from django.db import models
 
 # Todo : image upload path will be specific date.
 class Photo(models.Model):
-    user = models.CharField(max_length=50, blank=False)
+    userId = models.CharField(max_length=50, blank=False)
     photo = models.CharField(max_length=100, blank=False)
     price = models.IntegerField(blank=False)
     detail = models.CharField(max_length=150, blank=False)
