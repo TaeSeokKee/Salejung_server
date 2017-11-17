@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import logging
+import os
+from decouple import config
+
 from .models import Photo
 from .serializers import PhotoGetSerializer
 from django.shortcuts import render
@@ -9,16 +13,19 @@ from rest_framework.response import Response
 from rest_framework import status
 from decimal import Decimal
 from .form import PhotoForm
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.http import JsonResponse
-import firebase_admin
-from firebase_admin import credentials
-# Import the Firebase service
-from firebase_admin import auth
-import logging
-import os
-from decouple import config
 
+# FCM request
+import requests
+import json
+
+# Import the Firebase service
+import firebase_admin
+from firebase_admin import auth
+from firebase_admin import credentials
+
+# firebase authentication
+cred = credentials.Certificate(config('FIREBASE_ADMIN_KEY'))
+default_app = firebase_admin.initialize_app(cred)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 firebaseAddminKeyPath = os.path.join(BASE_DIR, config('FIREBASE_ADMIN_KEY'))
@@ -26,14 +33,34 @@ firebaseAddminKeyPath = os.path.join(BASE_DIR, config('FIREBASE_ADMIN_KEY'))
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger('photo logger')
 
-cred = credentials.Certificate(firebaseAddminKeyPath)
-default_app = firebase_admin.initialize_app(cred)
-
 # Search range from present LOCATION(lat, lng). It's equal to search space(square)'s half length.
 # If SEARCH_RANGE is 1, then search space is 2*2 square.
 SEARCH_RANGE = 60
 POST_SUCCESS = 1
 POST_FAIL = 0
+
+url_server = 'https://fcm.googleapis.com/fcm/send'
+
+def sendFCMByTopic(topic):
+
+    url_server = 'https://fcm.googleapis.com/fcm/send'
+
+    post_data = {
+      "to": "/topics/" + topic,
+      "data": {
+        "message": "This is a Firebase Cloud Messaging Topic Message!",
+       }
+    }
+
+    post_headers = { 
+        "Authorization" : "key=" + config('FCM_KEY'),
+        "content-type" : "application/json" 
+    }
+
+    response = requests.post(url_server, headers = post_headers, data = json.dumps(post_data))
+    print(response.text)
+    print(response.headers)
+
 
 def index(request):
     template_name = 'photos/index.html'
@@ -73,16 +100,16 @@ def postLatLng(request):
         lat = request.POST['lat']
         lng = request.POST['lng']
 
-        if userId == None:
+        if userId == "":
             logger.warning("userId is None")
 
-        if userIdToken == None:
+        if userIdToken == "":
             logger.warning("userIdToken is None")
 
-        if lat == None:
+        if lat == "":
             logger.warning("lat is None")
 
-        if lng == None:
+        if lng == "":
             logger.warning("lng is None")
 
 
@@ -104,16 +131,19 @@ def postPhoto(request):
         userId = request.POST['userId']
         userIdToken = request.POST['userIdToken']
 
-        if userId == None:
+        if userId == "":
             logger.warning("userId is None")
 
-        if userIdToken == None:
+        if userIdToken == "":
             logger.warning("userIdToken is None")
 
         if authentication_check(userId, userIdToken) == True:
+            logger.debug("authentication_check success")
             form = PhotoForm(request.POST)
             if form.is_valid():
+                logger.debug("form is valid")
                 form.save()
+                sendFCMByTopic(request.POST['topic']);
                 return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
             else:
                 return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)

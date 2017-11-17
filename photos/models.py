@@ -13,6 +13,7 @@ class Photo(models.Model):
     lng = models.DecimalField(max_digits=9, decimal_places=6, blank=False)
     address = models.CharField(max_length=100, blank=False)
     country = models.CharField(max_length=10, blank=False)
+    topic = models.CharField(max_length=20, blank=False)
 
 
     class Meta:
