@@ -41,14 +41,15 @@ POST_FAIL = 0
 
 url_server = 'https://fcm.googleapis.com/fcm/send'
 
-def sendFCMByTopic(topic):
 
+def sendFCMByTopic(topic, photoFilePath, detail):
     url_server = 'https://fcm.googleapis.com/fcm/send'
-
     post_data = {
       "to": "/topics/" + topic,
       "data": {
         "message": "This is a Firebase Cloud Messaging Topic Message!",
+        "photoFilePath" : photoFilePath,
+        "detail" : detail,
        }
     }
 
@@ -143,7 +144,10 @@ def postPhoto(request):
             if form.is_valid():
                 logger.debug("form is valid")
                 form.save()
-                sendFCMByTopic(request.POST['topic']);
+                sendFCMByTopic(request.POST['topic'],
+                    request.POST['photoFilePath'],
+                    request.POST['detail']
+                    );
                 return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
             else:
                 return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
