@@ -39,17 +39,46 @@ SEARCH_RANGE = 60
 POST_SUCCESS = 1
 POST_FAIL = 0
 
+FCM_TOPIC_LNG_LAT_DISTANCE = 0.005
+
 url_server = 'https://fcm.googleapis.com/fcm/send'
 
 
-def sendFCMByTopic(topic, photoFilePath, detail):
+# topic format : {lng}_{lat} ex) 123.456_-123.456
+# 3x3 means send FCM to 9 topics that nears from sender's location 
+# which is sender's topic value's (lng, lat) near 500m distance.
+# topic_5 is center(input topic value).
+# 2017/11/19 at present, FCM topic is up to 5. So split request.
+def sendFCMByTopic_3x3(topic, photoFilePath, detail):
     url_server = 'https://fcm.googleapis.com/fcm/send'
+
+    lng_lat = topic.split("_")
+    
+    lng = float(lng_lat[0])
+    lat = float(lng_lat[1])
+
+    topic_1 = "%.3f" % (lng - FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat + FCM_TOPIC_LNG_LAT_DISTANCE)
+    topic_2 = "%.3f" % (lng                             ) + "_" + "%.3f" % (lat + FCM_TOPIC_LNG_LAT_DISTANCE)
+    topic_3 = "%.3f" % (lng + FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat + FCM_TOPIC_LNG_LAT_DISTANCE)
+    topic_4 = "%.3f" % (lng - FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat                             )
+    topic_5 = topic
+    topic_6 = "%.3f" % (lng + FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat                             )
+    topic_7 = "%.3f" % (lng - FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat - FCM_TOPIC_LNG_LAT_DISTANCE)
+    topic_8 = "%.3f" % (lng                             ) + "_" + "%.3f" % (lat - FCM_TOPIC_LNG_LAT_DISTANCE)
+    topic_9 = "%.3f" % (lng + FCM_TOPIC_LNG_LAT_DISTANCE) + "_" + "%.3f" % (lat - FCM_TOPIC_LNG_LAT_DISTANCE)
+
+    print(topic_1, topic_2, topic_3, topic_4, topic_5, topic_6, topic_7, topic_8, topic_9)
+
     post_data = {
-      "to": "/topics/" + topic,
-      "data": {
-        "message": "This is a Firebase Cloud Messaging Topic Message!",
-        "photoFilePath" : photoFilePath,
-        "detail" : detail,
+        "condition": "'" + topic_1 + "'" +  " in topics" 
+            + " || '" + topic_2 + "' in topics"
+            + " || '" + topic_3 + "' in topics"
+            + " || '" + topic_4 + "' in topics"
+            + " || '" + topic_5 + "' in topics",
+        "data": {
+            "message": "This is a Firebase Cloud Messaging Topic Message!",
+            "photoFilePath" : photoFilePath,
+            "detail" : detail,
        }
     }
 
@@ -59,6 +88,30 @@ def sendFCMByTopic(topic, photoFilePath, detail):
     }
 
     response = requests.post(url_server, headers = post_headers, data = json.dumps(post_data))
+
+    print(response.text)
+    print(response.headers)
+
+
+    post_data = {
+        "condition": "'" + topic_6 + "'" +  " in topics" 
+            + " || '" + topic_7 + "' in topics"
+            + " || '" + topic_8 + "' in topics"
+            + " || '" + topic_9 + "' in topics",
+        "data": {
+            "message": "This is a Firebase Cloud Messaging Topic Message!",
+            "photoFilePath" : photoFilePath,
+            "detail" : detail,
+       }
+    }
+
+    post_headers = { 
+        "Authorization" : "key=" + config('FCM_KEY'),
+        "content-type" : "application/json" 
+    }
+
+    response = requests.post(url_server, headers = post_headers, data = json.dumps(post_data))
+
     print(response.text)
     print(response.headers)
 
@@ -144,7 +197,7 @@ def postPhoto(request):
             if form.is_valid():
                 logger.debug("form is valid")
                 form.save()
-                sendFCMByTopic(request.POST['topic'],
+                sendFCMByTopic_3x3(request.POST['topic'],
                     request.POST['photoFilePath'],
                     request.POST['detail']
                     );
