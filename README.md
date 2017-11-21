@@ -1,3 +1,3 @@
 # salejung_server
 
-you are always welcome to contribution!
+All contributions and suggestions are welcome!
