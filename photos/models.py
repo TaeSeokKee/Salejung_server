@@ -13,11 +13,13 @@ class Photo(models.Model):
     address = models.CharField(max_length=100, blank=False)
     country = models.CharField(max_length=10, blank=False)
     topic = models.CharField(max_length=20, blank=False)
+    channelUrl = models.CharField(max_length=150, blank=False)
 
 
     class Meta:
         # lng index and next lat index is more efficient.
         indexes = [
-            models.Index(fields=['lng', 'lat'])
+            models.Index(fields=['lng', 'lat']),
+            models.Index(fields=['userId']),
         ]
 

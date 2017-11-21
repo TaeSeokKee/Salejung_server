@@ -5,7 +5,8 @@ import os
 from decouple import config
 
 from .models import Photo
-from .serializers import PhotoGetSerializer
+from .serializers import GetItemByLngLatSerializer
+from .serializers import GetItemByUserIdSerializer
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
@@ -125,7 +126,11 @@ def get_query(lat, lng):
     return Photo.objects.filter(lng__gt=Decimal(lng)-Decimal(SEARCH_RANGE))\
     .filter(lng__lt=Decimal(lng)+Decimal(SEARCH_RANGE))\
     .filter(lat__gt=Decimal(lat)-Decimal(SEARCH_RANGE))\
-    .filter(lat__lt=Decimal(lat)+Decimal(SEARCH_RANGE))[:50]
+    .filter(lat__lt=Decimal(lat)+Decimal(SEARCH_RANGE))[:100]
+
+
+def get_query(userid):
+    return Photo.objects.filter(userId=userid)
 
 
 def authentication_check(userId, userIdToken):
@@ -144,21 +149,14 @@ def authentication_check(userId, userIdToken):
 
 @api_view(['POST'])
 @csrf_exempt
-def postLatLng(request):
+def getItemByLngLat(request):
     if request.method == 'POST':
         
         print(request.POST)
 
-        userId = request.POST['userId']
-        userIdToken = request.POST['userIdToken']
         lat = request.POST['lat']
         lng = request.POST['lng']
 
-        if userId == "":
-            logger.warning("userId is None")
-
-        if userIdToken == "":
-            logger.warning("userIdToken is None")
 
         if lat == "":
             logger.warning("lat is None")
@@ -167,17 +165,35 @@ def postLatLng(request):
             logger.warning("lng is None")
 
 
-        if authentication_check(userId, userIdToken) == True:
-            serializer = PhotoGetSerializer(get_query(lat, lng), many=True)
-            return Response(serializer.data)
-        else:
-            # TODO : fix return 
-            return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+        ############ If authentication need ################ 
+
+        # userId = request.POST['userId']
+        # userIdToken = request.POST['userIdToken']
+
+        # if userId == "":
+        #     logger.warning("userId is None")
+
+        # if userIdToken == "":
+        #     logger.warning("userIdToken is None")
+
+        # if authentication_check(userId, userIdToken) == True:
+        #     serializer = PhotoGetSerializer(get_query(lat, lng), many=True)
+        #     return Response(serializer.data)
+        # else:
+        #     # TODO : fix return 
+        #     return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+
+        ############################################
+
+        serializer = GetItemByLngLatSerializer(get_query(lat, lng), many=True)
+        return Response(serializer.data)
+
+       
 
 
 @api_view(['POST'])
 @csrf_exempt
-def postPhoto(request):
+def addPhoto(request):
     if request.method == 'POST':
 
         print(request.POST)
@@ -206,3 +222,28 @@ def postPhoto(request):
                 return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@csrf_exempt
+def getItemByUserId(request):
+    if request.method == 'POST':
+
+        print(request.POST)
+
+        userId = request.POST['userId']
+        userIdToken = request.POST['userIdToken']
+
+        if userId == "":
+            logger.warning("userId is None")
+
+        if userIdToken == "":
+            logger.warning("userIdToken is None")
+
+        if authentication_check(userId, userIdToken) == True:
+            logger.debug("authentication_check success")
+            serializer = GetItemByLngLatSerializer(get_query(userId), many=True)
+            return Response(serializer.data)
+        else:
+            return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+
