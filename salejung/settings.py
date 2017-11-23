@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'photos',
+    'item',
+    'fcmUserToken',
 
     'rest_framework',
     'storages',

@@ -1,3 +1,3 @@
 # salejung_server
 
-All contributions and suggestions are welcome!
+ - version : salejung_server branch goes parallel with salejung_android branch.

@@ -4,16 +4,17 @@ import logging
 import os
 from decouple import config
 
-from .models import Photo
-from .serializers import GetItemByLngLatSerializer
+from .models import Item
+from .serializers import GetItemInfoByLngLatSerializer
 from .serializers import GetItemByUserIdSerializer
+from .serializers import GetItemLocationByLngLatSerializer
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from decimal import Decimal
-from .form import PhotoForm
+from .form import ItemForm
 
 # FCM request
 import requests
@@ -24,19 +25,16 @@ import firebase_admin
 from firebase_admin import auth
 from firebase_admin import credentials
 
-# firebase authentication
-cred = credentials.Certificate(config('FIREBASE_ADMIN_KEY'))
-default_app = firebase_admin.initialize_app(cred)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 firebaseAddminKeyPath = os.path.join(BASE_DIR, config('FIREBASE_ADMIN_KEY'))
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger('photo logger')
+logger = logging.getLogger('Item logger')
 
 # Search range from present LOCATION(lat, lng). It's equal to search space(square)'s half length.
 # If SEARCH_RANGE is 1, then search space is 2*2 square.
-SEARCH_RANGE = 60
+SEARCH_RANGE = 0.01
 POST_SUCCESS = 1
 POST_FAIL = 0
 
@@ -50,7 +48,7 @@ url_server = 'https://fcm.googleapis.com/fcm/send'
 # which is sender's topic value's (lng, lat) near 500m distance.
 # topic_5 is center(input topic value).
 # 2017/11/19 at present, FCM topic is up to 5. So split request.
-def sendFCMByTopic_3x3(topic, photoFilePath, detail):
+def sendFCMByTopic_3x3(topic, photoFilePath, name, price):
     url_server = 'https://fcm.googleapis.com/fcm/send'
 
     lng_lat = topic.split("_")
@@ -79,7 +77,7 @@ def sendFCMByTopic_3x3(topic, photoFilePath, detail):
         "data": {
             "message": "This is a Firebase Cloud Messaging Topic Message!",
             "photoFilePath" : photoFilePath,
-            "detail" : detail,
+            "detail" : name + " " + price,
        }
     }
 
@@ -102,7 +100,7 @@ def sendFCMByTopic_3x3(topic, photoFilePath, detail):
         "data": {
             "message": "This is a Firebase Cloud Messaging Topic Message!",
             "photoFilePath" : photoFilePath,
-            "detail" : detail,
+            "detail" : name + " " + price,
        }
     }
 
@@ -118,19 +116,9 @@ def sendFCMByTopic_3x3(topic, photoFilePath, detail):
 
 
 def index(request):
-    template_name = 'photos/index.html'
+    template_name = 'item/index.html'
     return render(request, template_name)
 
-
-def get_query(lat, lng):
-    return Photo.objects.filter(lng__gt=Decimal(lng)-Decimal(SEARCH_RANGE))\
-    .filter(lng__lt=Decimal(lng)+Decimal(SEARCH_RANGE))\
-    .filter(lat__gt=Decimal(lat)-Decimal(SEARCH_RANGE))\
-    .filter(lat__lt=Decimal(lat)+Decimal(SEARCH_RANGE))[:100]
-
-
-def get_query(userid):
-    return Photo.objects.filter(userId=userid)
 
 
 def authentication_check(userId, userIdToken):
@@ -147,9 +135,21 @@ def authentication_check(userId, userIdToken):
         return False
 
 
+
+
+
+def query_get_ItemInfoList_ByLngLat(lat, lng):
+    return Item.objects.filter(lng__gt=Decimal(lng)-Decimal(SEARCH_RANGE))\
+    .filter(lng__lt=Decimal(lng)+Decimal(SEARCH_RANGE))\
+    .filter(lat__gt=Decimal(lat)-Decimal(SEARCH_RANGE))\
+    .filter(lat__lt=Decimal(lat)+Decimal(SEARCH_RANGE))[:100]
+
+
+
+
 @api_view(['POST'])
 @csrf_exempt
-def getItemByLngLat(request):
+def getItemInfoByLngLat(request):
     if request.method == 'POST':
         
         print(request.POST)
@@ -164,28 +164,7 @@ def getItemByLngLat(request):
         if lng == "":
             logger.warning("lng is None")
 
-
-        ############ If authentication need ################ 
-
-        # userId = request.POST['userId']
-        # userIdToken = request.POST['userIdToken']
-
-        # if userId == "":
-        #     logger.warning("userId is None")
-
-        # if userIdToken == "":
-        #     logger.warning("userIdToken is None")
-
-        # if authentication_check(userId, userIdToken) == True:
-        #     serializer = PhotoGetSerializer(get_query(lat, lng), many=True)
-        #     return Response(serializer.data)
-        # else:
-        #     # TODO : fix return 
-        #     return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
-
-        ############################################
-
-        serializer = GetItemByLngLatSerializer(get_query(lat, lng), many=True)
+        serializer = GetItemInfoByLngLatSerializer(query_get_ItemInfoList_ByLngLat(lat, lng), many=True)
         return Response(serializer.data)
 
        
@@ -193,7 +172,7 @@ def getItemByLngLat(request):
 
 @api_view(['POST'])
 @csrf_exempt
-def addPhoto(request):
+def addItem(request):
     if request.method == 'POST':
 
         print(request.POST)
@@ -209,13 +188,14 @@ def addPhoto(request):
 
         if authentication_check(userId, userIdToken) == True:
             logger.debug("authentication_check success")
-            form = PhotoForm(request.POST)
+            form = ItemForm(request.POST)
             if form.is_valid():
                 logger.debug("form is valid")
                 form.save()
                 sendFCMByTopic_3x3(request.POST['topic'],
                     request.POST['photoFilePath'],
-                    request.POST['detail']
+                    request.POST['name'],
+                    request.POST['price']
                     );
                 return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
             else:
@@ -224,9 +204,17 @@ def addPhoto(request):
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+
+
+def query_get_ItemInfoList_ByUser(userid):
+    return Item.objects.filter(userId=userid)
+
+
+
 @api_view(['POST'])
 @csrf_exempt
-def getItemByUserId(request):
+def getItemInfoByUserId(request):
     if request.method == 'POST':
 
         print(request.POST)
@@ -242,8 +230,32 @@ def getItemByUserId(request):
 
         if authentication_check(userId, userIdToken) == True:
             logger.debug("authentication_check success")
-            serializer = GetItemByLngLatSerializer(get_query(userId), many=True)
+            serializer = GetItemByUserIdSerializer(query_get_ItemInfoList_ByUser(userId), many=True)
             return Response(serializer.data)
         else:
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
 
+
+
+
+
+@api_view(['POST'])
+@csrf_exempt
+def getItemLocationByLngLat(request):
+    if request.method == 'POST':
+
+        print(request.POST)
+
+        lat = request.POST['lat']
+        lng = request.POST['lng']
+
+
+        if lat == "":
+            logger.warning("lat is None")
+
+        if lng == "":
+            logger.warning("lng is None")
+
+
+        serializer = GetItemLocationByLngLatSerializer(query_get_ItemInfoList_ByLngLat(lat, lng), many=True)
+        return Response(serializer.data)
