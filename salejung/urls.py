@@ -18,6 +18,5 @@ from django.contrib import admin
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^fcm/', include('fcmUserToken.urls')),
     url(r'^item/', include('item.urls')),
     ]

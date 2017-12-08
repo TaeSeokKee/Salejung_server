@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'item',
-    'fcmUserToken',
+    
 
     'rest_framework',
     'storages',

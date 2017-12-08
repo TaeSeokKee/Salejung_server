@@ -6,7 +6,6 @@ class ItemForm(forms.ModelForm):
     class Meta:
         model = Item
         fields = (
-            '_id',
             'userId', 
         	'photoFilePath', 
         	'name',
@@ -15,7 +14,9 @@ class ItemForm(forms.ModelForm):
         	'lat', 
         	'lng', 
         	'address', 
-        	'country', 
-        	'topic', 
-        	'channelUrl', 
+        	'country',
+        	'channelUrl',
+            'category', 
+            'detail',
+            'isClosed',
             )

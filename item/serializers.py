@@ -2,20 +2,27 @@ from .models import Item
 from rest_framework import serializers
 
 
-class GetItemInfoByLngLatSerializer(serializers.ModelSerializer):
+class GetItemsInfoByLngLatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
-        fields = ('photoFilePath', 'name', 'channelUrl', 'price', )
+        fields = ('id', 'photoFilePath', 'name', 'channelUrl', 'price', 'detail', )
 
 
-class GetItemByUserIdSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Item
-        fields = ('photoFilePath', 'name', 'date', 'channelUrl', 'price',)
-
-
-class GetItemLocationByLngLatSerializer(serializers.ModelSerializer):
+class GetItemsLocationByLngLatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = ('lng', 'lat', )
+
+
+class GetItemByIdForRemoveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        fields = ('id', 'userId', )
+
+
+class GetItemByIdSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        fields = ('id', 'photoFilePath', 'name', 'price', 'lng', 'lat',)
+
 
