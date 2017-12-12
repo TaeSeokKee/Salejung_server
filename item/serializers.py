@@ -17,7 +17,7 @@ class GetItemsLocationByLngLatSerializer(serializers.ModelSerializer):
 class GetItemByIdForRemoveSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
-        fields = ('id', 'userId', )
+        fields = ('id', 'userId', 'channelUrl', )
 
 
 class GetItemByIdSerializer(serializers.ModelSerializer):

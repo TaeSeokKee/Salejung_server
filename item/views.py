@@ -60,6 +60,7 @@ FCM_SERVER = 'https://fcm.googleapis.com/fcm/send'
 
 CLOUD_STORE_COLLECTION_MYWATCHLIST = u'myWatchList'
 CLOUD_STORE_COLLECTION_MYITEMLIST = u'myItemList'
+CLOUD_STORE_COLLECTION_ITEM_HISTORY = u'item_history'
 
 SEARCH_LNG_LAT_STARTINDEX = 0
 SEARCH_LNG_LAT_ENDINDEX = 100
@@ -191,7 +192,7 @@ def getItemById(request):
         if authentication_check(userId, userIdToken) == True:
             logger.debug("authentication_check success")
             serializer = GetItemByIdSerializer(query_get_Item_By_Id(itemId))
-            return Response(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
 
@@ -206,7 +207,7 @@ def addItemToMyItemList(itemId, request):
             u'userId': request.POST['userId'],
             u'itemId': itemId,
             u'unReadCount': 0,
-            u'updateDate': 0,
+            u'updateDate': request.POST['date'],
             u'channelUrl': request.POST['channelUrl'],
             u'photoFilePath': request.POST['photoFilePath'],
             u'name': request.POST['name'],
@@ -214,10 +215,33 @@ def addItemToMyItemList(itemId, request):
             u'isClosed': False
             })
     except google.gax.errors.GaxError as e:
-            print(e)
+            logger.debug("addItemToMyItemList error")
             addItemToMyItemList(itemId, request)
-            
-    
+
+
+# it is google-cloud-python credential issue.
+# when use google-cloud-python retry needs.
+# because of frequent gaxerror, need to retry when error occur.
+def addItemToItemHistory(itemId, request):
+    try:
+        collRef = db.collection(CLOUD_STORE_COLLECTION_ITEM_HISTORY)
+        collRef.add({
+            u'userId': request.POST['userId'],
+            u'itemId': itemId,
+            u'openDate': request.POST['date'],
+            u'closeDate': 0,
+            u'channelUrl': request.POST['channelUrl'],
+            u'photoFilePath': request.POST['photoFilePath'],
+            u'name': request.POST['name'],
+            u'price': request.POST['price'],
+            u'isClosed': False,
+            u'thumb_up': 0,
+            u'thumb_down': 0
+            })
+    except google.gax.errors.GaxError as e:
+            logger.debug("addItemToItemHistory error")
+            addItemToItemHistory(request)
+
 
 @api_view(['POST'])
 @csrf_exempt
@@ -229,7 +253,6 @@ def addItem(request):
         userId = request.POST['userId']
         userIdToken = request.POST['userIdToken']
         channelUrl = request.POST['channelUrl']
-
 
         if userId == "":
             logger.warning("userId is None")
@@ -254,8 +277,13 @@ def addItem(request):
                 # because of frequent gaxerror, need to retry when error occur.
                 addItemToMyItemList(itemId, request)
 
+                # it is google-cloud-python credential issue.
+                # when use google-cloud-python retry needs.
+                # because of frequent gaxerror, need to retry when error occur.
+                addItemToItemHistory(itemId, request)
+
                 serializer = GetItemByIdSerializer(query_get_Item_By_Id(itemId))
-                return Response(serializer.data)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
             else:
                 logger.warning("Some authenticated user failed to add item because of form invalid")
                 return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
@@ -361,27 +389,49 @@ def sendFcmToOperator(request):
                 request.POST['to'],
             )
 
-            return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
+            return Response(POST_SUCCESS, status=status.HTTP_200_OK)
         else:
             logger.warning("Some unauthenticated request tried to send fcm to channel operator!")
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 # it is google-cloud-python credential issue.
 # when use google-cloud-python retry needs.
 # because of frequent gaxerror, need to retry when error occur.
-def deleteItemFromMyItemListByItemId(itemId):
+def deleteMyItemList(doc_id):
     try:
-        docs = db.collection(CLOUD_STORE_COLLECTION_MYITEMLIST)\
+        db.collection(CLOUD_STORE_COLLECTION_MYITEMLIST).document(doc_id).delete()
+    except google.gax.errors.GaxError as e:
+        logger.debug("deleteMyItemList error")
+        deleteMyItemList(doc_id)
+
+
+# it is google-cloud-python credential issue.
+# when use google-cloud-python retry needs.
+# because of frequent gaxerror, need to retry when error occur.
+def getDocIdFromMyItemListByItemId(itemId):
+    doc_id = ""
+    try:
+        doc = db.collection(CLOUD_STORE_COLLECTION_MYITEMLIST)\
         .where(u'itemId', u'==', int(itemId))\
         .get()
-        for doc in docs:
-            print(u'{} => {}'.format(doc.id, doc.to_dict()))
-            db.collection(CLOUD_STORE_COLLECTION_MYITEMLIST).document(doc.id).delete()
+        for mDocument in doc:
+            doc_id = mDocument.id
     except google.gax.errors.GaxError as e:
-        print(e)
-        deleteItemFromMyItemListByItemId(itemId)
-             
+        logger.debug("getDocIdFromMyItemListByItemId error")
+        getDocIdFromMyItemListByItemId(itemId)
+    else :
+        return doc_id
+
+
+# it is google-cloud-python credential issue.
+# when use google-cloud-python retry needs.
+# because of frequent gaxerror, need to retry when error occur.      
+def deleteMyItemFromMyItemList(itemId):
+    doc_id = getDocIdFromMyItemListByItemId(itemId)
+    deleteMyItemList(doc_id)
+
 
 @api_view(['POST'])
 @csrf_exempt
@@ -390,8 +440,6 @@ def removeItem(request):
 
         print(request.POST)
 
-        # In android volley Stringrequest send itemId value as string. So need to change to long(int) type.
-        # If find way to send itemId as long type with volley, change android code.
         itemId = int(request.POST['itemId'])
         userId = request.POST['userId']
         userIdToken = request.POST['userIdToken']
@@ -409,18 +457,90 @@ def removeItem(request):
             print(serializer.data)
             if serializer.data['userId'] == userId:
                 logger.debug("authentication_check success_2")
-                # it is google-cloud-python credential issue.
-                # when use google-cloud-python retry needs.
-                # because of frequent gaxerror, need to retry when error occur.
-                deleteItemFromMyItemListByItemId(itemId)
+
+                deleteMyItemFromMyItemList(itemId)
                     
                 item.isClosed = True
                 item.save()
 
-                return Response(POST_SUCCESS, status=status.HTTP_201_CREATED)
+                return Response(POST_SUCCESS, status=status.HTTP_200_OK)
             else:
                 logger.warning("Some user tried to remove other user's item!")
                 return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            logger.warning("Some unauthenticated request tried to remove item")
+            return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+# it is google-cloud-python credential issue.
+# when use google-cloud-python retry needs.
+# because of frequent gaxerror, need to retry when error occur.
+def deleteHistory(doc_id):
+    try:
+        db.collection(CLOUD_STORE_COLLECTION_ITEM_HISTORY).document(doc_id).delete()
+    except google.gax.errors.GaxError as e:
+        print(e)
+        deleteHistory(doc_id)
+
+
+# it is google-cloud-python credential issue.
+# when use google-cloud-python retry needs.
+# because of frequent gaxerror, need to retry when error occur.
+def getDocumentFromItemHistory(userId):
+    docs = []
+    try:
+        docs = db.collection(CLOUD_STORE_COLLECTION_ITEM_HISTORY)\
+        .where(u'userId', u'==', userId)\
+        .get()
+    except google.gax.errors.GaxError as e:
+        print(e)
+        getDocumentFromItemHistory(userId)
+    else :
+        return docs
+
+
+
+def deleteHistoryFromItemHistory(userId):
+    docs = getDocumentFromItemHistory(userId)
+    for doc in docs:
+        deleteHistory(doc.id)
+
+
+
+@api_view(['POST'])
+@csrf_exempt
+def deleteAccount(request):
+    if request.method == 'POST':
+
+        print(request.POST)
+
+        userId = request.POST['userId']
+        userIdToken = request.POST['userIdToken']
+
+        if userId == "":
+            logger.warning("userId is None")
+
+        if userIdToken == "":
+            logger.warning("userIdToken is None")
+
+        if authentication_check(userId, userIdToken) == True:
+            logger.debug("authentication_check success")
+            items = Item.objects.filter(userId=userId, isClosed=False)
+            print(items)
+            for item in items:
+                print(item.id)
+                itemId = item.id
+                item = Item.objects.get(id=itemId)
+                item.isClosed = True
+                item.save()
+
+                deleteMyItemFromMyItemList(itemId)
+
+                deleteHistoryFromItemHistory(userId)
+            
+            return Response(POST_SUCCESS, status=status.HTTP_200_OK)
+            
         else:
             logger.warning("Some unauthenticated request tried to remove item")
             return Response(POST_FAIL, status=status.HTTP_400_BAD_REQUEST)

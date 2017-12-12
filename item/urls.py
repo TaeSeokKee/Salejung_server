@@ -8,5 +8,6 @@ urlpatterns = [
     url(r'^getItemsLocationByLngLat/', views.getItemsLocationByLngLat, name='getItemsLocationByLngLat'),
     url(r'^getItemById/', views.getItemById, name='getItemById'),
     url(r'^removeItem/', views.removeItem, name='removeItem'),
+    url(r'^deleteAccount/', views.deleteAccount, name='deleteAccount'),
     url(r'^', views.index, name='index'),
 ]
